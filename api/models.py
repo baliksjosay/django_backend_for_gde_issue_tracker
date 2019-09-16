@@ -17,14 +17,13 @@ class Client(models.Model):
 class User(AbstractUser):
     email = models.EmailField(primary_key=True)
     user_email = models.EmailField()
-    # client_name = models.CharField(max_length=250)
     client_name = models.ForeignKey(Client, on_delete=models.SET_NULL, null=True)
     password = models.CharField(max_length=250)
     user_name = models.CharField(max_length=250)
     user_role = models.CharField(max_length=150)
-    # isGDEstaff = models.CharField(max_length=150)
-    # assignments = 
     timestamp = models.DateTimeField(auto_now_add=True)
+    isGDEstaff = models.CharField(max_length=150)
+    # assignments = 
     status = models.BooleanField(default=True)
     class Meta:
         db_table = 'users'

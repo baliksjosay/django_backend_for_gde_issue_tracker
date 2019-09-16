@@ -11,7 +11,7 @@ from rest_framework_jwt.utils import jwt_payload_handler
 from api.serializers import GetClient, GetProject, GetIssues, PutIssueComment, PutPerformedAction, PutProjectClient
 # from api import support_functions as SupportFunctions
 
-from api.models import User, Project, Client, IssueTicket
+from api.models import User, Project, Client, IssueTicket, ProjectClient
 import datetime, json
 from _datetime import datetime, timedelta
 from django.views.decorators.csrf import csrf_exempt
@@ -205,7 +205,8 @@ class IssuesList(APIView):
             issue_type = data['issue_type'],
             next_party = 'Admin',
             status = 'New',
-            status_reason = 'New Issue Recorded'
+            status_reason = 'New Issue Recorded',
+            added_by = User.objects.get(username = data['user_id'])
         )
         
         try: 
@@ -224,7 +225,7 @@ class IssuesList(APIView):
             return Response(response, status=status.HTTP_200_OK)
         finally:
             try:
-                dnp = ActionPerformed(rd.pk, data['user_id'], 'Added new client issue', 'New client issue logged')
+                dnp = ActionPerformed(rd.pk, data['user_id'], 'Added new issue ticket', 'New issue ticket logged')
                 dnp.save()
             except:
                 pass
@@ -270,18 +271,23 @@ class IssueAction(APIView):
 
         if data['attachment_file'] == "null":
             post_data = {
+                
             # 'issue': IssueTicket.objects.get(issue_title = data['issue']),
             'issue': data['issue'],
             'comment': data['action_comments'],
-            'user': User.objects.get(email = data['user_email'])
+            #'gdadmin_recomandation': data['action_comments'],
+            'assigned_to': data['assigned_to'],
+            'user': User.objects.get(email = data['email'])
         } 
         else:
             post_data = {
                 # 'issue': IssueTicket.objects.get(issue_title = data['issue']),
                 'issue': data['issue'],
                 'comment': data['action_comments'],
+                # 'gdadmin_recomandation': data['action_comments'],
+                'assigned_to': data['assigned_to'],
                 'attachments_file': data['attachment_file'],
-                'user': User.objects.get(email = data['user_email'])
+                'user': User.objects.get(email = data['email'])
             }           
         rc = PutIssueComment(data = post_data)
 
@@ -299,23 +305,19 @@ class IssueAction(APIView):
                 rq.save()
                 if data['action'] == 'Assigned':
                     # send out notifications
-                    dnp = ActionPerformed(rq.pk, data['user_id'], 'Assigned to support personnel', 
+                    dnp = ActionPerformed(rq.pk, data['email'], 'Assigned to support personnel', 
                                             data['action_comments'])
                     dnp.save()
                 elif data['action'] == 'Closed':
-                    dnp = ActionPerformed(rq.pk, data['user_id'], 'Issue closed',
+                    dnp = ActionPerformed(rq.pk, data['email'], 'Issue closed',
                                           data['action_comments'])
                     dnp.save()
                 elif data['action'] == 'Pending':
-                    dnp = ActionPerformed(rq.pk, data['user_id'], 'Issue pending customer input',
-                                          data['action_comments'])
-                    dnp.save()
-                elif data['action'] == 'Rejected':
-                    dnp = ActionPerformed(rq.pk, data['user_id'], 'Issue has been rejected',
+                    dnp = ActionPerformed(rq.pk, data['email'], 'Issue pending customer input',
                                           data['action_comments'])
                     dnp.save()
                 elif data['action'] == 'Resolved':
-                    dnp = ActionPerformed(rq.pk, data['user_id'], 'Issue has been resolved by support personnel',
+                    dnp = ActionPerformed(rq.pk, data['email'], 'Issue has been resolved by support personnel',
                                           data['action_comments'])
                     dnp.save() 
 
@@ -390,14 +392,7 @@ class ActionPerformed:
             req.status_reason = self.status_reason
             req.next_party = user_roles[1]
             req.save()
-        elif req.status == 'Pending':
-            req.status_reason = self.status_reason
-            req.next_party = user_roles[0]
-            req.save()
-        elif req.status == 'Rejected':
-            req.status_reason = self.status_reason
-            req.next_party = user_roles[0]
-            req.save()
+        
         elif req.status == 'Closed':
             req.next_party = 'Closed'
             req.status_reason = self.status_reason
@@ -425,7 +420,22 @@ class GetStatusCount(APIView):
         counter = {}
         for x in statuses:
             no = IssueTicket.objects.values('id').filter(status=x).count()
-            counter.update({x:no})            
+            counter.update({x:no}) 
+
+              
         # counter = str(counter)
 
+        clients_number = Client.objects.values('id').count()
+        counter.update({'Clients_number':clients_number})
+        projects_number = Project.objects.values('id').count()
+        counter.update({'Projects_number':projects_number})
+
+        # support_users_number = User.objects.values('is_staff').count()
+        # counter.update({'Support_users_number':support_users_number})
+
+        # client_user_number = User.objects.values('Client').count()
+        # counter.update({'Client_users_number':client_users_number})
+
+        user_number = User.objects.values('email').count()
+        counter.update({'Users_number':user_number})
         return Response(json.dumps(counter), status=status.HTTP_200_OK)

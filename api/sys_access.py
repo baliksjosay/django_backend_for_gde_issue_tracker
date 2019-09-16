@@ -52,7 +52,7 @@ class UserMgt(APIView):
         user_role = data['user_role']
         password = data['signup_password']
 
-        if data['gde_staff'] == 'YES':
+        if data['gde_staff'] == 'Support':
             is_staff = True
         else:
              is_staff = False
@@ -70,8 +70,8 @@ class UserMgt(APIView):
             response['username'] = auth_user.user_name
             response['email'] = auth_user.email
             response['isGDE_staff'] = auth_user.is_staff
-            response['message'] = "User Successfully created"
             response['user_role'] = auth_user.user_role
+            response['message'] = "User Successfully created"
             response['code'] = 200
             # print(response)
             return Response(response, status=status.HTTP_200_OK)
@@ -134,6 +134,7 @@ class UserMgt(APIView):
                                   
             users = GetUsers(users, many=True)
             return Response(users.data, status = status.HTTP_200_OK)
+
 
         
 class ApplicationUser:
