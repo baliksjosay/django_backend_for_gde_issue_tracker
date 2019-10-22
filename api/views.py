@@ -1,5 +1,7 @@
 from django.shortcuts import render
 from django.db.models import Q
+from django.core.mail import send_mail
+from api.email_notifications import EmailNotification
 
 from rest_framework import status
 from rest_framework.views import APIView
@@ -47,6 +49,7 @@ class ClientList(APIView):
             try:
                 dnp = ActionPerformed(rd.pk, data['user_id'], 'Added new client', 'New client logged')
                 dnp.save()
+                
             except:
                 pass
 
@@ -190,6 +193,7 @@ class IssuesList(APIView):
     parser_classes = (MultiPartParser, FormParser)
     permission_classes = (AllowAny, )
     def post(self, request, format=None):
+        
         # authentication = SupportFunctions.get_authentication_details(request)
         data = request.data.dict()
         
@@ -225,10 +229,12 @@ class IssuesList(APIView):
             return Response(response, status=status.HTTP_200_OK)
         finally:
             try:
-                dnp = ActionPerformed(rd.pk, data['user_id'], 'Added new issue ticket', 'New issue ticket logged')
+                dnp = ActionPerformed(rd.pk, data['user_id'], 'Added new issue ticket', 'New issue ticket logged', None)
                 dnp.save()
+                print('saved action')
             except:
                 pass
+        # EmailNotification('New Issue has been logged', "Please login to the issue tracker", 'gdexpertsug@gmail.com').send()
 
     def get(self, request, format=None):
         issue_status = request.GET.get('status')
@@ -248,6 +254,7 @@ class IssuesList(APIView):
             client_name = request.GET.get('client_name')
             issue_id = request.GET.get('client_id')
             issue_name = request.GET.get('issue_name')
+            user_name = request.GET.get('user_name')
 
             if not issue_id == None and len(issue_id) > 0:
                 issues = issues.filter(id = issue_id)
@@ -256,7 +263,9 @@ class IssuesList(APIView):
                     issues = issues.filter(client_name__icontains = client_name)
                 if not issue_name == None and len(issue_name) > 0:
                     issues = issues.filter(issue_title__icontains = issue_name)
-                                  
+                if not user_name == None and len(user_name) > 0:
+                    issues = issues.filter(added_by__icontains = user_name)
+                                     
             issues = GetIssues(issues, many=True)
             return Response(issues.data, status = status.HTTP_200_OK)
 
@@ -269,13 +278,14 @@ class IssueAction(APIView):
         # authentication = SupportFunctions.get_authentication_details(request)
         data = request.data.dict()
 
+        print(data)
+
         if data['attachment_file'] == "null":
             post_data = {
                 
             # 'issue': IssueTicket.objects.get(issue_title = data['issue']),
             'issue': data['issue'],
             'comment': data['action_comments'],
-            #'gdadmin_recomandation': data['action_comments'],
             'assigned_to': data['assigned_to'],
             'user': User.objects.get(email = data['email'])
         } 
@@ -284,7 +294,6 @@ class IssueAction(APIView):
                 # 'issue': IssueTicket.objects.get(issue_title = data['issue']),
                 'issue': data['issue'],
                 'comment': data['action_comments'],
-                # 'gdadmin_recomandation': data['action_comments'],
                 'assigned_to': data['assigned_to'],
                 'attachments_file': data['attachment_file'],
                 'user': User.objects.get(email = data['email'])
@@ -305,20 +314,24 @@ class IssueAction(APIView):
                 rq.save()
                 if data['action'] == 'Assigned':
                     # send out notifications
-                    dnp = ActionPerformed(rq.pk, data['email'], 'Assigned to support personnel', 
-                                            data['action_comments'])
+                    dnp = ActionPerformed(rq.pk, data['email'], 'Assigned ticket', 
+                                            data['action_comments'],data['assigned_to'])
+                    print('SAVING')
                     dnp.save()
                 elif data['action'] == 'Closed':
                     dnp = ActionPerformed(rq.pk, data['email'], 'Issue closed',
-                                          data['action_comments'])
+                                          data['action_comments'], None)
+                                            
+
                     dnp.save()
-                elif data['action'] == 'Pending':
-                    dnp = ActionPerformed(rq.pk, data['email'], 'Issue pending customer input',
-                                          data['action_comments'])
+                elif data['action'] == 'Recieved':
+                    dnp = ActionPerformed(rq.pk, data['email'], 'Issue is recieved, pending resolution',
+                                          data['action_comments'], None)
                     dnp.save()
                 elif data['action'] == 'Resolved':
-                    dnp = ActionPerformed(rq.pk, data['email'], 'Issue has been resolved by support personnel',
-                                          data['action_comments'])
+                    dnp = ActionPerformed(rq.pk, data['email'], 'Issue has been resolved ',
+                                          data['action_comments'], None)
+                                        
                     dnp.save() 
 
         else:
@@ -331,22 +344,60 @@ class IssueAction(APIView):
             return Response(response, status=status.HTTP_200_OK)
 
 
+
 class ActionPerformed:
-    def __init__(self, affected_issue, user_id, action_performed, status_reason):
+    # EmailNotification('GDExperts Support Alert', "Please login to the issue tracker", 'gdexpertsug@gmail.com').send()
+    def __init__(self, affected_issue, user_id, action_performed, status_reason, assigned_to, action_comments):
         # self.affected_project = affected_project
         self.affected_issue = affected_issue
         self.user_id = user_id
         self.action_performed = action_performed
         self.status_reason = status_reason
+        self.assigned_to =  assigned_to
+        # self.action_comments = action_comments
+        self.body_string = """
+            <head><style>table {
+            font-family: arial, sans-serif;
+            border-collapse: collapse;
+            width: 100%;
+            }
+
+            td, th {
+            border: 1px solid black;
+            text-align: left;
+            padding: 8px;
+            }
+
+            tr:nth-child(even) {
+            background-color: #dddddd;
+            }
+            </style></head>
+            <h2>Hello, There is an update on the issue tracker</h2><br>
+            
+            <table border="2">
+                <tr style = "background-color: yellow">
+                    <th>Ticket Id</th>
+                    <th>Added by</th>
+                    <th>Urgency</th>
+                    <th>Request Status</th>
+                    <th>Status Reason</th>
+                    <th>Action</th>
+                </tr>
+        """
         
 
+
+
+
     def save(self):
+        print(self.assigned_to)
         pa = PutPerformedAction(
             data = {
-                # 'affected_project': self.affected_project,
                 'affected_issue': self.affected_issue,
                 'performed_by': self.user_id,
-                'action': self.action_performed
+                'action': self.action_performed,
+                'assigned_to': self.assigned_to
+                # 'action_comments': self.action_comments
             }
         )
         if pa.is_valid():
@@ -388,6 +439,10 @@ class ActionPerformed:
             req.status_reason = self.status_reason
             req.next_party = user_roles[2]
             req.save()
+        elif req.status == 'Recieved':
+            req.next_party = user_roles[2]
+            req.save()
+            return True
         elif req.status == 'Resolved':
             req.status_reason = self.status_reason
             req.next_party = user_roles[1]
@@ -405,13 +460,38 @@ class ActionPerformed:
             req.status_reason = self.status_reason
             req.save()
             return True
+    def send_out_notification(self, request_object):
+        data = """<tr>
+            <td>"""+str(request_object.id)+"""</td>
+            <td>"""+str(request_object.added_by)+"""</td>
+            <td>"""+str(request_object.urgency)+"""</td>
+            <td>"""+str(request_object.status)+"""</td>
+            <td>"""+str(request_object.status_reason)+"""</td>            
+            <td>"""+str(self.action_performed)+"""</td>            
+            </tr>
+        """
+        try:
+            son = SupportFunctions.Notification(
+                ['joseph.balikuddembe@gdexperts.com'],
+                ['joseph.balikuddembe@gdexperts.com'],
+                ['joseph.balikuddembe@gdexperts.com'],
+                'Issue Ticket Notification',
+                self.body_string + data
+            )
+            son.send_notification()
+            return True
+        except Exception as e:
+            print(e)
+            return False
+
 
 class GetStatusCount(APIView):
     def get(self, request, format=None):
         # the possible request statuses
         statuses = [
             'New', 
-            'Resolved', 
+            'Resolved',
+            'Recieved', 
             'Assigned',
             'Pending', 
             'Closed',            
@@ -432,7 +512,6 @@ class GetStatusCount(APIView):
 
         # support_users_number = User.objects.values('is_staff').count()
         # counter.update({'Support_users_number':support_users_number})
-
         # client_user_number = User.objects.values('Client').count()
         # counter.update({'Client_users_number':client_users_number})
 

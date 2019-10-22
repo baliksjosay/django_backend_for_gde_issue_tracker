@@ -15,12 +15,18 @@ from django.db import transaction
 import jwt, datetime
 
 
+from api.email_notifications import EmailNotification
+
 class UserLogin(APIView):
     """
     Login of users
     """
     permission_classes = (AllowAny, )
+    # def get(self, request, format=None):
+    #     EmailNotification('Subject', "Message", 'gdexpertsug@gmail.com').send()
+
     def post(self, request, format=None):
+        
 
         
         auth_user = User.objects.get(email = request.data['user_email'])
@@ -31,6 +37,8 @@ class UserLogin(APIView):
         token = jwt.encode(payload, settings.SECRET_KEY)
         response['token'] = token
         response['username'] = auth_user.user_name
+        response['first_name'] = auth_user.first_name
+        response['last_name'] = auth_user.last_name
         response['email'] = auth_user.email
         response['message'] = "Welcome"
         response['user_role'] = auth_user.user_role
@@ -51,7 +59,7 @@ class UserMgt(APIView):
         user_email = data['user_email']
         user_role = data['user_role']
         password = data['signup_password']
-
+        print(user_role)
         if data['gde_staff'] == 'Support':
             is_staff = True
         else:
@@ -158,7 +166,7 @@ class ApplicationUser:
                 user = User.objects.get(email=self.user_email)
                 user.username = self.user_name
                 user.user_role = self.user_role
-                user.client_name = self.company_name
+                user.client_name = Clients.objects.get(client_name = data['client_name'])
                 user.isGDEStaff = self.is_staff
 
                 user.save()

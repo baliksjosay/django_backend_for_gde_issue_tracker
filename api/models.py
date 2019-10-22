@@ -4,9 +4,9 @@ import uuid
 
 
 class Client(models.Model):
-    id = models.BigAutoField(primary_key=True)
+    id = models.BigAutoField(primary_key=True, )
     location = models.CharField(max_length=250)
-    client_name = models.CharField(max_length=250)
+    client_name = models.CharField(max_length=250, unique=True)
     client_contact = models.CharField(max_length=250)
     status = models.BooleanField(default=True)
     timestamp = models.DateTimeField(auto_now_add=True)
@@ -31,7 +31,7 @@ class User(AbstractUser):
 
 class Project(models.Model):
     id = models.BigAutoField(primary_key=True)
-    project_name = models.CharField(max_length=250)
+    project_name = models.CharField(max_length=250, unique=True)
     project_description = models.CharField(max_length=250)
     # attachments = models.FileField(upload_to='projects')
     status = models.BooleanField(default=True)
@@ -58,11 +58,12 @@ class IssueTicket(models.Model):
     priority_reason = models.CharField(max_length=250)
     submission_comments = models.CharField(max_length=250)
     issue_type = models.CharField(max_length=250)
-    attachments = models.FileField(upload_to='issues')
+    attachments = models.FileField(upload_to='issues', null=True)
     added_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     status = models.CharField(max_length=250)
     next_party = models.CharField(max_length=250)
     status_reason = models.CharField(max_length=250)
+    # assigned_to = models.CharField(max_length=250)
     timestamp = models.DateTimeField(auto_now_add=True)
     class Meta:
         db_table = 'issue_tickets'
@@ -82,7 +83,7 @@ class IssueComment(models.Model):
 class EditLog(models.Model):
     id = models.UUIDField(primary_key=True, default = uuid.uuid4, editable = False)
     affected_column = models.CharField(max_length = 200, null=True)
-    affected_project = models.ForeignKey(Project, on_delete=models.CASCADE, null=True)
+    # affected_project = models.ForeignKey(Project, on_delete=models.CASCADE, null=True)
     old_value = models.CharField(max_length=200, null=True)
     new_value = models.CharField(max_length=200, null=True)
     description = models.TextField()
@@ -95,10 +96,11 @@ class EditLog(models.Model):
 
 class PerformedAction(models.Model):
     id = models.UUIDField(primary_key=True, default = uuid.uuid4, editable = False)
-    affected_project = models.ForeignKey(Project, on_delete=models.CASCADE, null=True)
+    # affected_project = models.ForeignKey(Project, on_delete=models.CASCADE, null=True)
     affected_issue = models.ForeignKey(IssueTicket, on_delete=models.CASCADE, null=True)
-    performed_by = models.ForeignKey(User, on_delete = models.SET_NULL, null=True)
+    performed_by = models.ForeignKey(User, on_delete = models.SET_NULL, null=True, related_name='performer')
     action = models.TextField()
+    assigned_to = models.ForeignKey(User, on_delete = models.SET_NULL, null=True, related_name='assigned_to')
     timestamp = models.DateTimeField(auto_now_add=True)
     class Meta:
         db_table = 'performed_actions'

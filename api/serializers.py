@@ -23,20 +23,38 @@ class PutProjectClient(serializers.ModelSerializer):
         model = ProjectClient
         fields = ('__all__')
 
+class GetProjectClient(serializers.ModelSerializer):
+    client_projects = serializers.SerializerMethodField()
+    class Meta:
+        model =ProjectClient
+        fields = ('__all__')
+
+
 class PutIssue(serializers.ModelSerializer):
     class Meta:
         model = IssueTicket
         fields = ('__all__')
 
 class GetUsers(serializers.ModelSerializer):
+    audit_trail = serializers.SerializerMethodField()
     class Meta:
         model = User
         fields = ('__all__')
+    def get_audit_trail(self, assigned_to_id):
+        pas = PerformedAction.objects.filter(assigned_to = assigned_to_id.pk)
+        pas = PutPerformedAction(pas, many=True)
+        return pas.data
 
 class GetIssue(serializers.ModelSerializer):
+    audit_trail = serializers.SerializerMethodField()
     class Meta:
         model = IssueTicket
         fields = ('__all__')
+    def get_audit_trail(self, issue):
+        pas = PerformedAction.objects.filter(affected_issue = issue.pk)
+        pas = PutPerformedAction(pas, many=True)
+        return pas.data
+
 
 
 class GetClient(serializers.ModelSerializer):
@@ -65,7 +83,7 @@ class GetProject(serializers.ModelSerializer):
         except:
             return None
     def get_activity_log(self, req):
-        pas = PerformedAction.objects.filter(affected_project = req.pk)
+        pas = PerformedAction.objects.filter(affected_issue = req.pk)
         pas = PutPerformedAction(pas, many=True)
         return pas.data
     def get_project_issues(self, req):
@@ -80,6 +98,7 @@ class GetProject(serializers.ModelSerializer):
 
 class GetIssues(serializers.ModelSerializer):
     project_with_issue = serializers.SerializerMethodField()
+    audit_trail = serializers.SerializerMethodField()
     class Meta:
         model = IssueTicket
         fields = ('__all__')
@@ -87,7 +106,10 @@ class GetIssues(serializers.ModelSerializer):
         rcs = Project.objects.filter(project_name = req.pk)
         rcs = GetProject(rcs, many=True)
         return rcs.data
-
+    def get_audit_trail(self, issue):
+        pas = PerformedAction.objects.filter(affected_issue = issue.pk)
+        pas = PutPerformedAction(pas, many=True)
+        return pas.data
 
 
 class PutPerformedAction(serializers.ModelSerializer):
